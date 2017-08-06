@@ -1,3 +1,10 @@
+/*
+ * Program to run and compute several terminologies of probability
+ * Run the code and follow the instructions provided in console.
+ * */
+#define PLOT 1		//change to 0 to not use gnuplot
+#define WIN 0		//change to 1 for Windows
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <iostream>
@@ -11,11 +18,19 @@ using namespace std;
 
 long dataset_len;
 int** dataset;
+
 struct randomVariable {
 	double probability = 0;
 	long occurence = 0;
 	long outcome = 0;
 };
+
+struct expectedValue {
+	double exp = 0;		//First moment
+	double exp_2 = 0;	//Second momment
+};
+
+//Function to check valid data row
 bool check_validity(enum event event1,int data1) {
 	bool flag = true;
 	if(event1 == marital) {
@@ -34,6 +49,7 @@ bool check_validity(enum event event1,int data1) {
 	return flag;
 }
 
+//Funtion to find probability/conditional probability of a random variable
 struct randomVariable probability(enum event event_a, int value_a,enum event event_b, int value_b) {
 	struct randomVariable RV;
 	bool do_not_use_b = false;
@@ -52,13 +68,37 @@ struct randomVariable probability(enum event event_a, int value_a,enum event eve
 	return RV;
 }
 
-void gnuplot(double xmin, double xmax, double ymin, double ymax) {
+
+//Returns expected value of random variable
+struct expectedValue expected_value(enum event eventa,int minv, int maxv,
+					enum event eventb, int valueb)
+{
+	struct randomVariable r;
+	struct expectedValue e;
+	for(int i = minv; i <= maxv; i++) {
+		 r = probability(eventa,i,eventb,valueb);
+		 e.exp += r.probability*i;
+		 e.exp_2 += r.probability*i*i;
+	}
+	double p = probability(eventb,valueb,eventa,-1).probability;
+	e.exp /= p;
+	e.exp_2 /= p;
+	return e;
+}
+
+
+//Pipeline to gnuplot for plotting graphs
+void gnuplot(double xmin, double xmax, double ymin, double ymax,char* filename) {
+#if PLOT==1
 	FILE *gnuplotPipe = popen("gnuplot", "w");  // Open a pipe to gnuplot
 	if (gnuplotPipe) {   // If gnuplot is found
 		fprintf(gnuplotPipe, "reset\n"); //gnuplot commands
 		fprintf(gnuplotPipe,"set xrange [%f:%f]\nset yrange [%f:%f]\n",xmin,xmax,ymin,ymax);
 		fprintf(gnuplotPipe,"set boxwidth 0.5\n");
 		fprintf(gnuplotPipe,"set style fill solid\n");
+		fprintf(gnuplotPipe,"set term png\n set output '%s'\n",filename);
+		fprintf(gnuplotPipe, "plot 'plotdata.dat' using 1:3:xtic(2) with boxes title 'PDF'\n");
+		fprintf(gnuplotPipe,"set term x11\n");
 		fprintf(gnuplotPipe, "plot 'plotdata.dat' using 1:3:xtic(2) with boxes title 'PDF'\n");
 		fflush(gnuplotPipe); //flush pipe
 		cout << "Press any key to exit GNUplot";
@@ -67,8 +107,10 @@ void gnuplot(double xmin, double xmax, double ymin, double ymax) {
 		fprintf(gnuplotPipe,"exit \n");   // exit gnuplot
 		pclose(gnuplotPipe);    //close pipe
 	}
+#endif
 }
 
+//driver function
 int main(void) {
 	dataset = preprocess_data("sub-data.txt",&dataset_len,1.0);
 	struct randomVariable RV_m = probability(marital,married,agewed,-1);
@@ -76,11 +118,15 @@ int main(void) {
 	struct randomVariable RV_d = probability(marital,divorced,agewed,-1);
 	struct randomVariable RV_s = probability(marital,separated,agewed,-1);
 	struct randomVariable RV_o = probability(marital,never_married,agewed,-1);
+
 	//gui code here
 	here :
+#if WIN == 0
 	system("clear");
+#elif WIN == 1
+	system("cls");
+#endif
 	unsigned int choice;
-	//sample space
 	cout << "For a given age of a person, the sample space about the current marital status is \n{Married, Widowed, Divorced, Separated, Never Married}" << endl;
 	cout << "Let them be denoted by :\nMarried = M\nWidowed = W\nDivorced = D\nSeparated = S\nNever Married = O\n"<<endl;
 	cout << endl;
@@ -96,7 +142,10 @@ int main(void) {
 	cout << "9. Gaussian/Normal distribution of age for married, marital status"<<endl;
 	cout << "0. Exit" <<endl;
 	cin >> choice;
-	if(choice == 0) {
+
+	//Choice decision ladder
+	if(choice == 0) {		//Exit invoked
+		free_mem(dataset);
 		return 0;
 	} else {
 		if(choice == 1) {
@@ -145,7 +194,7 @@ int main(void) {
 			plotdata <<"4 separated "<<RV_s.probability<<endl;
 			plotdata <<"5 never_married "<<RV_o.probability<<endl;
 			plotdata.close();
-			gnuplot(0,6,0,1.5);			//Plot graph function using gnuplot and read from file plotdata.dat
+			gnuplot(0,6,0,1.5,"pdf");			//Plot graph function using gnuplot and read from file plotdata.dat
 		} else if(choice == 6) {
 			ofstream plotdata;		// file to store data points to plot
 			plotdata.open("plotdata.dat");
@@ -155,69 +204,25 @@ int main(void) {
 			plotdata <<"4 sep/div/wid/mar "<<RV_s.probability+RV_d.probability+RV_w.probability+RV_m.probability<<endl;
 			plotdata <<"5 samplespace "<<RV_o.probability+RV_s.probability+RV_d.probability+RV_w.probability+RV_m.probability<<endl;
 			plotdata.close();
-			gnuplot(0,6,0,1.5);			//Plot graph function using gnuplot and read from file plotdata.dat
+			gnuplot(0,6,0,1.5,"cdf");			//Plot graph function using gnuplot and read from file plotdata.dat
 		} else if(choice == 7) {
-			struct randomVariable r;
-			double exp_m = 0, exp_w = 0, exp_d = 0, exp_s = 0, exp_o = 0;
-			for(int i = 1; i <= 97; i++) {
-				 r = probability(agewed,i,marital,married);
-				 exp_m += r.probability*i;
-				 r = probability(agewed,i,marital,widowed);
-				 exp_w += r.probability*i;
-				 r = probability(agewed,i,marital,divorced);
-				 exp_d += r.probability*i;
-				 r = probability(agewed,i,marital,separated);
-				 exp_s += r.probability*i;
-				 r = probability(agewed,i,marital,never_married);
-				 exp_o += r.probability*i;
-			}
-			exp_m /= probability(marital,married,agewed,-1).probability;
-			exp_w /= probability(marital,widowed,agewed,-1).probability;
-			exp_d /= probability(marital,divorced,agewed,-1).probability;
-			exp_s /= probability(marital,separated,agewed,-1).probability;
-			exp_o /= probability(marital,never_married,agewed,-1).probability;
-
-			cout << "E(Married_AgeWed) = " <<exp_m <<endl;
-			cout << "E(Widowed_AgeWed) = " <<exp_w <<endl;
-			cout << "E(Divorced_AgeWed) = " <<exp_d <<endl;
-			cout << "E(Separated_AgeWed) = " <<exp_s <<endl;
-			cout << "E(Never_Married_AgeWed) = " <<exp_o <<endl;
+			cout << "E(Married_AgeWed) = " << expected_value(agewed,1,98,marital,married).exp <<endl;
+			cout << "E(Widowed_AgeWed) = " << expected_value(agewed,1,98,marital,widowed).exp <<endl;
+			cout << "E(Divorced_AgeWed) = " << expected_value(agewed,1,98,marital,divorced).exp <<endl;
+			cout << "E(Separated_AgeWed) = " << expected_value(agewed,1,98,marital,separated).exp <<endl;
+			cout << "E(Never_Married_AgeWed) = " << expected_value(agewed,1,98,marital,never_married).exp <<endl;
 		} else if(choice == 8) {
-			struct randomVariable r;
-			double exp_m = 0, exp_w = 0, exp_d = 0, exp_s = 0, exp_o = 0;
-			double exp_m_2 = 0, exp_w_2 = 0, exp_d_2 = 0, exp_s_2 = 0, exp_o_2 = 0;
-			for(int i = 1; i <= 97; i++) {
-				 r = probability(agewed,i,marital,married);
-				 exp_m += r.probability*i;
-				 exp_m_2 += r.probability*i*i;
-				 r = probability(agewed,i,marital,widowed);
-				 exp_w += r.probability*i;
-				 exp_w_2 += r.probability*i*i;
-				 r = probability(agewed,i,marital,divorced);
-				 exp_d += r.probability*i;
-				 exp_d_2 += r.probability*i*i;
-				 r = probability(agewed,i,marital,separated);
-				 exp_s += r.probability*i;
-				 exp_s_2 += r.probability*i*i;
-				 r = probability(agewed,i,marital,never_married);
-				 exp_o += r.probability*i;
-				 exp_o_2 += r.probability*i*i;
-			}
-			exp_m /= probability(marital,married,agewed,-1).probability;
-			exp_w /= probability(marital,widowed,agewed,-1).probability;
-			exp_d /= probability(marital,divorced,agewed,-1).probability;
-			exp_s /= probability(marital,separated,agewed,-1).probability;
-			exp_o /= probability(marital,never_married,agewed,-1).probability;
-			exp_m_2 /= probability(marital,married,agewed,-1).probability;
-			exp_w_2 /= probability(marital,widowed,agewed,-1).probability;
-			exp_d_2 /= probability(marital,divorced,agewed,-1).probability;
-			exp_s_2 /= probability(marital,separated,agewed,-1).probability;
-			exp_o_2 /= probability(marital,never_married,agewed,-1).probability;
-			cout << "SD(Married_AgeWed) = " <<sqrt(exp_m_2 - exp_m*exp_m) <<endl;
-			cout << "SD(Widowed_AgeWed) = " <<sqrt(exp_w_2 - exp_w*exp_w) <<endl;
-			cout << "SD(Divorced_AgeWed) = " <<sqrt(exp_d_2 - exp_d*exp_d) <<endl;
-			cout << "SD(Separated_AgeWed) = " <<sqrt(exp_s_2 - exp_s*exp_s) <<endl;
-			cout << "SD(Never_Married_AgeWed) = " <<sqrt(exp_o_2 - exp_o*exp_o) <<endl;
+			struct expectedValue e;
+			e = expected_value(agewed,1,98,marital,married);
+			cout << "SD(Married_AgeWed) = " <<sqrt(e.exp_2 - e.exp*e.exp) <<endl;
+			e = expected_value(agewed,1,98,marital,widowed);
+			cout << "SD(Widowed_AgeWed) = " <<sqrt(e.exp_2 - e.exp*e.exp) <<endl;
+			e = expected_value(agewed,1,98,marital,divorced);
+			cout << "SD(Divorced_AgeWed) = " <<sqrt(e.exp_2 - e.exp*e.exp) <<endl;
+			e = expected_value(agewed,1,98,marital,separated);
+			cout << "SD(Separated_AgeWed) = " <<sqrt(e.exp_2 - e.exp*e.exp) <<endl;
+			e = expected_value(agewed,1,98,marital,never_married);
+			cout << "SD(Never_Married_AgeWed) = " <<sqrt(e.exp_2 - e.exp*e.exp) <<endl;
 		} else if(choice == 9) {
 			ofstream plotdata;		// file to store data points to plot
 			plotdata.open("plotdata.dat");
@@ -231,7 +236,7 @@ int main(void) {
 				}
 			}
 			plotdata.close();
-			gnuplot(1,98,0,max+1);			//Plot graph function using gnuplot and read from file plotdata.dat
+			gnuplot(1,98,0,max+1,"gaussian");			//Plot graph function using gnuplot and read from file plotdata.dat
 		}
 	}	
 	cout << endl;
@@ -240,7 +245,6 @@ int main(void) {
 	getchar();
 	cout << "=========================================================" <<endl;
 	cout << endl;
-	goto here;
-	free_mem(dataset);
+	goto here;	//return to gui beginning
 }
 
