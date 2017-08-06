@@ -12,6 +12,6 @@ The application can calculate probability, conditional probability, random varia
 * Once done with the above steps, you can run the code and follow console instructions to use the application.
 
 # Note
-* If you do not want to setup GNUplot, the plots are saved in the repository with apt names. To ignore plot commands change macro "PLOT" to 0 in main.cpp. Otherwise, there can be error.
-* Also on Windows, change macro "WIN" to 1 in main.cpp.
+* If you do not want to setup GNUplot, the plots are saved in the repository with apt names. To ignore plot commands change macro 'PLOT' to '0' in 'main.cpp'. Otherwise, there can be error.
+* Also on Windows, change macro 'WIN' to '1' in 'main.cpp'.
 
