@@ -81,8 +81,10 @@ struct expectedValue expected_value(enum event eventa,int minv, int maxv,
 		 e.exp_2 += r.probability*i*i;
 	}
 	double p = probability(eventb,valueb,eventa,-1).probability;
-	e.exp /= p;
-	e.exp_2 /= p;
+	if(p != 0) {
+		e.exp /= p;
+		e.exp_2 /= p;
+	}
 	return e;
 }
 
@@ -140,6 +142,7 @@ int main(void) {
 	cout << "7. Expected value of age for each marital status:"<<endl;
 	cout << "8. Standard deviation of age for each marital status:"<<endl;
 	cout << "9. Gaussian/Normal distribution of age for married, marital status"<<endl;
+	cout << "10. Covariance and Correlation b/w Marital and Age Of Wedding"<<endl;
 	cout << "0. Exit" <<endl;
 	cin >> choice;
 
@@ -237,8 +240,24 @@ int main(void) {
 			}
 			plotdata.close();
 			gnuplot(1,98,0,max+1,"gaussian");			//Plot graph function using gnuplot and read from file plotdata.dat
+		} else if(choice == 10) {
+			struct expectedValue age = expected_value(agewed,12,90,marital,-1), mar = expected_value(marital,1,5,agewed,-1);
+			double var_age = (age.exp_2 - age.exp*age.exp);
+			double var_mar = (mar.exp_2 - mar.exp*mar.exp);
+			double covar = 0, correl = 0;
+			long n = 0;
+			for(long i = 0; i < dataset_len; i++) {
+				if(check_validity(marital,dataset[i][marital]) && check_validity(agewed,dataset[i][agewed])) {
+					covar += (dataset[i][marital] - mar.exp)*(dataset[i][agewed] - age.exp);
+					n++;
+				}
+			}
+			covar /= (n-1);
+			correl = covar/sqrt(var_age*var_mar);
+			cout <<"Covariance : " <<covar << endl;
+			cout <<"Correlation : " <<correl << endl;
 		}
-	}	
+	}
 	cout << endl;
 	cout << "Press any key to continue....";
 	getchar();
